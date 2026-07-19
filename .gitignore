@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+.env
+.env.example
+requirements.txt
+render.yaml
+
+# Environment Variables
+.env
+.env.*
+
+# Django
+db.sqlite3
+*.log
+
+# Static and Media
+media/
+staticfiles/
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Node (if you have a React/Vite frontend)
+node_modules/
+dist/
+
+# Build files
+*.egg-info/
