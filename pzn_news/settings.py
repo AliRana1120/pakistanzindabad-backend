@@ -205,27 +205,11 @@ CELERY_BEAT_SCHEDULE = {
 import os
 from decouple import config
 
-# Production settings
-DEBUG = config("DEBUG", default=False, cast=bool)
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost").split(",")
-
 # CORS — allow your Netlify frontend
 CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:3000").split(",")
 CORS_ALLOW_CREDENTIALS = True
 
-# Database
-import dj_database_url
-DATABASES = {
-    "default": dj_database_url.config(
-        default=config("DATABASE_URL", default="sqlite:///db.sqlite3"),
-        conn_max_age=600,
-        ssl_require=config("DB_SSL_REQUIRE", default=False, cast=bool),
-    )
-}
 
-# Redis / Celery
-CELERY_BROKER_URL = config("REDIS_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = config("REDIS_URL", default="redis://localhost:6379/0")
 
 # Static files
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")

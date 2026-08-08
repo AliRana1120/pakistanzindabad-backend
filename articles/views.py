@@ -304,19 +304,18 @@ def rss_feed(request):
            safe=False
         )
 
-# No cache exists, trigger refresh
     try:
-      refresh_rss_category.delay(category)
-    except Exception as e:
-      print(f"Celery unavailable: {e}")
+        refresh_rss_category.delay(category)
+    except Exception as exc:
+        logger.warning("Celery unavailable: %s", exc)
 
     return JsonResponse(
- {
-        "status": "loading",
-        "message": "News is being refreshed"
-    },
-    safe=False
-)
+        {
+            "status": "loading",
+            "message": "News is being refreshed",
+        },
+        safe=False,
+    )
 
 @api_view(["GET"])
 @permission_classes([AllowAny])

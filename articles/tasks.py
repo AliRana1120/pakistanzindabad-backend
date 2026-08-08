@@ -1,13 +1,15 @@
 import hashlib
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 import redis
 from celery import shared_task
 from django.conf import settings
 from deep_translator import GoogleTranslator
 
 from articles.categorizer import categorize
+
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------
 # Redis
@@ -20,8 +22,7 @@ REDIS_TTL = 60 * 60                    # 10 min — how long a rendered feed pag
 TRANSLATION_TTL = 60 * 60 * 24 * 7  # 1 week — a given headline's translation almost never changes
 
 # --------------------------------------------------------------------
-# RSS sources — single source of truth. (This used to be duplicated in
-# views.py too; don't re-add a second copy there.)
+# RSS sources
 # --------------------------------------------------------------------
 RSS_SOURCES = {
     "all": [
@@ -81,8 +82,8 @@ def translate_to_urdu(text):
 
     try:
         translated = _translator.translate(text)
-    except Exception as e:
-        print(f"Translation error for '{text[:40]}...': {e}")
+    except Exception as exc:
+        logger.warning("Translation error for '%s...': %s", text[:40], exc)
         return text
 
     _redis.setex(cache_key, TRANSLATION_TTL, translated)
@@ -109,8 +110,8 @@ def _fetch_one(url, source_name, category_slug):
 
     try:
         feed = feedparser.parse(url)
-    except Exception as e:
-        print(f"Feed parse error {url}: {e}")
+    except Exception as exc:
+        logger.warning("Feed parse error %s: %s", url, exc)
         return []
 
     if not feed or not feed.entries:
@@ -182,23 +183,22 @@ def refresh_rss_category(category="all"):
         for f in as_completed(futures):
             try:
                 all_items.extend(f.result())
-            except Exception as e:
-                print(f"RSS fetch failed: {e}")
+            except Exception as exc:
+                logger.warning("RSS fetch failed: %s", exc)
 
     unique = _dedupe_and_filter(all_items, category)
 
     redis_key = f"{REDIS_KEY_PREFIX}{category}"
     if unique:
-      _redis.setex(
-        redis_key,
-        REDIS_TTL,
-        json.dumps(unique, ensure_ascii=False)
-    )
+        _redis.setex(
+            redis_key,
+            REDIS_TTL,
+            json.dumps(unique, ensure_ascii=False),
+        )
     else:
-      print(
-        f"RSS failed for {category}, keeping old cache"
-    )
-    print(f"RSS refreshed: {category} — {len(unique)} items")
+        logger.warning("RSS failed for %s, keeping old cache", category)
+
+    logger.info("RSS refreshed: %s — %d items", category, len(unique))
     return len(unique)
 
 
