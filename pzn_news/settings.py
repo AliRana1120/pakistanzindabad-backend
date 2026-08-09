@@ -166,37 +166,37 @@ from celery.schedules import crontab
 
 CELERY_BEAT_SCHEDULE = {
     "refresh-rss-all": {
-        "task": "backend.articles.tasks.refresh_rss_category",
+        "task": "articles.tasks.refresh_rss_category",
         "schedule": 300.0,  # every 5 minutes
         "args": ("all",),
     },
     "refresh-rss-pakistan": {
-        "task": "backend.articles.tasks.refresh_rss_category",
+        "task": "articles.tasks.refresh_rss_category",
         "schedule": 300.0,
         "args": ("pakistan",),
     },
     "refresh-rss-politics": {
-        "task": "backend.articles.tasks.refresh_rss_category",
+        "task": "articles.tasks.refresh_rss_category",
         "schedule": 300.0,
         "args": ("politics",),
     },
     "refresh-rss-sports": {
-        "task": "backend.articles.tasks.refresh_rss_category",
+        "task": "articles.tasks.refresh_rss_category",
         "schedule": 300.0,
         "args": ("sports",),
     },
     "refresh-rss-business": {
-        "task": "backend.articles.tasks.refresh_rss_category",
+        "task": "articles.tasks.refresh_rss_category",
         "schedule": 300.0,
         "args": ("business",),
     },
     "refresh-rss-technology": {
-        "task": "backend.articles.tasks.refresh_rss_category",
+        "task": "articles.tasks.refresh_rss_category",
         "schedule": 300.0,
         "args": ("technology",),
     },
     "refresh-rss-international": {
-        "task": "backend.articles.tasks.refresh_rss_category",
+        "task": "articles.tasks.refresh_rss_category",
         "schedule": 300.0,
         "args": ("international",),
     },

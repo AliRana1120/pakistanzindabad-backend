@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import xml.etree.ElementTree as ET
 from urllib.error import HTTPError, URLError
@@ -15,7 +16,9 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from articles.tasks import REDIS_KEY_PREFIX, _redis, refresh_rss_category
+from articles.tasks import REDIS_KEY_PREFIX, get_redis_client, refresh_rss_category, refresh_rss_category_sync
+
+logger = logging.getLogger(__name__)
 
 from .models import Article, Comment, Epaper
 from .permissions import IsAdminOrReadOnly
@@ -293,6 +296,7 @@ class CommentAdminViewSet(viewsets.ModelViewSet):
 @permission_classes([AllowAny])
 def rss_feed(request):
     try:
+        redis_client = get_redis_client()
         category = request.GET.get("category", "all")
 
         try:
@@ -301,27 +305,32 @@ def rss_feed(request):
             limit = 9
 
         redis_key = f"{REDIS_KEY_PREFIX}{category}"
+        cached = None
 
-        # Test Redis
-        cached = _redis.get(redis_key)
+        if redis_client is not None:
+            try:
+                cached = redis_client.get(redis_key)
+            except Exception as exc:
+                logger.warning("Redis unavailable in rss_feed: %s", exc)
 
         if cached:
             if isinstance(cached, bytes):
                 cached = cached.decode("utf-8")
 
+            return JsonResponse(json.loads(cached)[:limit], safe=False)
+
+        try:
+            task = refresh_rss_category.delay(category)
             return JsonResponse(
-                json.loads(cached)[:limit],
-                safe=False
+                {
+                    "status": "loading",
+                    "task_id": task.id,
+                    "message": "RSS refresh started",
+                }
             )
-
-        # Test Celery
-        task = refresh_rss_category.delay(category)
-
-        return JsonResponse({
-            "status": "loading",
-            "task_id": task.id,
-            "message": "RSS refresh started"
-        })
+        except Exception:
+            articles = refresh_rss_category_sync(category)
+            return JsonResponse(articles[:limit], safe=False)
 
     except Exception as exc:
         import traceback
@@ -339,14 +348,24 @@ def rss_feed(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def rss_ticker(request):
+    redis_client = get_redis_client()
     limit = int(request.GET.get("limit", 8))
     redis_key = f"{REDIS_KEY_PREFIX}all"
 
-    cached = _redis.get(redis_key)
-    if not cached:
-        return JsonResponse([], safe=False)
+    articles = None
+    if redis_client is not None:
+        try:
+            cached = redis_client.get(redis_key)
+            if cached:
+                if isinstance(cached, bytes):
+                    cached = cached.decode("utf-8")
+                articles = json.loads(cached)
+        except Exception as exc:
+            logger.warning("Redis unavailable in rss_ticker: %s", exc)
 
-    articles = json.loads(cached)
+    if articles is None:
+        articles = refresh_rss_category_sync("all")
+
     ticker = [
         {
             "title": item.get("title"),

@@ -1,6 +1,8 @@
+import functools
 import hashlib
 import json
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import redis
 from celery import shared_task
@@ -14,15 +16,43 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------
 # Redis
 # --------------------------------------------------------------------
-REDIS_URL = settings.REDIS_URL
-
-_redis = redis.Redis.from_url(
-    REDIS_URL,
-    decode_responses=True,
-)
 REDIS_KEY_PREFIX = "pzn:rss:"
 REDIS_TTL = 60 * 60                    # 10 min — how long a rendered feed page stays "fresh"
 TRANSLATION_TTL = 60 * 60 * 24 * 7  # 1 week — a given headline's translation almost never changes
+
+
+def _normalize_redis_url(raw_url: str) -> str | None:
+    if not raw_url:
+        return None
+
+    raw_url = raw_url.strip()
+    if raw_url.startswith("redis-cli "):
+        match = re.search(r"(redis://\S+)", raw_url)
+        if match:
+            raw_url = match.group(1)
+
+    if raw_url.startswith(("redis://", "rediss://")):
+        return raw_url
+
+    return None
+
+
+@functools.lru_cache(maxsize=1)
+def get_redis_client():
+    raw_url = getattr(settings, "REDIS_URL", "") or ""
+    normalized = _normalize_redis_url(raw_url)
+    if not normalized:
+        logger.warning("Redis URL is missing or invalid: %r", raw_url)
+        return None
+
+    try:
+        return redis.Redis.from_url(normalized, decode_responses=True)
+    except Exception as exc:
+        logger.warning("Unable to build Redis client: %s", exc)
+        return None
+
+
+_redis = get_redis_client()
 
 # --------------------------------------------------------------------
 # RSS sources
@@ -79,9 +109,13 @@ def translate_to_urdu(text):
         return text
 
     cache_key = f"pzn:tr:{hashlib.md5(text.encode('utf-8')).hexdigest()}"
-    cached = _redis.get(cache_key)
-    if cached is not None:
-        return cached
+    if _redis is not None:
+        try:
+            cached = _redis.get(cache_key)
+            if cached is not None:
+                return cached
+        except Exception as exc:
+            logger.warning("Translation cache unavailable: %s", exc)
 
     try:
         translated = _translator.translate(text)
@@ -89,7 +123,11 @@ def translate_to_urdu(text):
         logger.warning("Translation error for '%s...': %s", text[:40], exc)
         return text
 
-    _redis.setex(cache_key, TRANSLATION_TTL, translated)
+    if _redis is not None:
+        try:
+            _redis.setex(cache_key, TRANSLATION_TTL, translated)
+        except Exception as exc:
+            logger.warning("Unable to cache translation: %s", exc)
     return translated
 
 
@@ -164,16 +202,9 @@ def _dedupe_and_filter(all_items, category):
     return unique
 
 
-@shared_task(name="backend.articles.tasks.refresh_rss_category")
-def refresh_rss_category(category="all"):
+def _refresh_rss_category(category="all"):
     """
-    Celery task — fetches RSS feeds for a category, translates + runs
-    NLP categorization, stores the result in Redis.
-
-    This must be the ONLY place feeds get fetched/translated. Never call
-    _fetch_one or translate_to_urdu synchronously from a Django view —
-    that blocks the HTTP response on outbound network calls (feed fetch
-    + Google Translate) that can easily take several seconds.
+    Fetch RSS feeds for a category and optionally cache the result.
     """
     sources = RSS_SOURCES.get(category, RSS_SOURCES["all"])
 
@@ -190,19 +221,31 @@ def refresh_rss_category(category="all"):
                 logger.warning("RSS fetch failed: %s", exc)
 
     unique = _dedupe_and_filter(all_items, category)
-
     redis_key = f"{REDIS_KEY_PREFIX}{category}"
-    if unique:
-        _redis.setex(
-            redis_key,
-            REDIS_TTL,
-            json.dumps(unique, ensure_ascii=False),
-        )
-    else:
+
+    if unique and _redis is not None:
+        try:
+            _redis.setex(
+                redis_key,
+                REDIS_TTL,
+                json.dumps(unique, ensure_ascii=False),
+            )
+        except Exception as exc:
+            logger.warning("Unable to cache RSS results: %s", exc)
+    elif not unique:
         logger.warning("RSS failed for %s, keeping old cache", category)
 
     logger.info("RSS refreshed: %s — %d items", category, len(unique))
-    return len(unique)
+    return unique
+
+
+def refresh_rss_category_sync(category="all"):
+    return _refresh_rss_category(category)
+
+
+@shared_task(name="articles.tasks.refresh_rss_category")
+def refresh_rss_category(category="all"):
+    return refresh_rss_category_sync(category)
 
 
 @shared_task(name="articles.tasks.refresh_all_categories")
