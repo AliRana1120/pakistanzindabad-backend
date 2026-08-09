@@ -24,11 +24,7 @@ DEBUG = config(
     cast=bool,
 )
 
-ALLOWED_HOSTS = config(
-    "ALLOWED_HOSTS",
-    default="dailypakistanzindabadbackend-5r6naj6n.b4a.run,localhost,127.0.0.1",
-    cast=Csv(),
-)
+ALLOWED_HOSTS = ["*"]
 
 
 # =============================================================================
