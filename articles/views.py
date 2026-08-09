@@ -292,31 +292,50 @@ class CommentAdminViewSet(viewsets.ModelViewSet):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def rss_feed(request):
-    category = request.GET.get("category", "all")
-    limit = int(request.GET.get("limit", 9))
-    redis_key = f"{REDIS_KEY_PREFIX}{category}"
-
-    cached = _redis.get(redis_key)
-
-    if cached:
-        return JsonResponse(
-           json.loads(cached)[:limit],
-           safe=False
-        )
-
     try:
-        refresh_rss_category.delay(category)
-    except Exception as exc:
-        logger.warning("Celery unavailable: %s", exc)
+        category = request.GET.get("category", "all")
 
-    return JsonResponse(
-        {
+        try:
+            limit = int(request.GET.get("limit", 9))
+        except (TypeError, ValueError):
+            limit = 9
+
+        redis_key = f"{REDIS_KEY_PREFIX}{category}"
+
+        # Test Redis
+        cached = _redis.get(redis_key)
+
+        if cached:
+            if isinstance(cached, bytes):
+                cached = cached.decode("utf-8")
+
+            return JsonResponse(
+                json.loads(cached)[:limit],
+                safe=False
+            )
+
+        # Test Celery
+        task = refresh_rss_category.delay(category)
+
+        return JsonResponse({
             "status": "loading",
-            "message": "News is being refreshed",
-        },
-        safe=False,
-    )
+            "task_id": task.id,
+            "message": "RSS refresh started"
+        })
 
+    except Exception as exc:
+        import traceback
+
+        return JsonResponse(
+            {
+                "error": type(exc).__name__,
+                "message": str(exc),
+                "traceback": traceback.format_exc(),
+            },
+            status=500,
+        )
+        
+        
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def rss_ticker(request):
