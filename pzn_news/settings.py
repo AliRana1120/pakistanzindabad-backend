@@ -132,24 +132,21 @@ raw_cors_origins = config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
 CORS_ALLOWED_ORIGINS = [origin for origin in raw_cors_origins if origin]
 if DEBUG and not CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://dailypakistanzindabad.vercel.app"
-    ]
-
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^http://localhost(:\d+)?$",
-    r"^http://127\.0\.0\.1(:\d+)?$",
-    r"^http://0\.0\.0\.0(:\d+)?$",
+    "https://dailypakistanzindabad.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
 CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
 APPEND_SLASH = True
-
+CSRF_TRUSTED_ORIGINS = [
+    "https://dailypakistanzindabad.vercel.app",
+]
 
 # ── Celery ────────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = config("REDIS_URL", default="redis://localhost:6379/0")
@@ -201,13 +198,3 @@ CELERY_BEAT_SCHEDULE = {
         "args": ("international",),
     },
 }
-
-import os
-from decouple import config
-
-
-
-
-# Static files
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
