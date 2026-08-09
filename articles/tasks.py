@@ -14,9 +14,12 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------
 # Redis
 # --------------------------------------------------------------------
-REDIS_URL = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
-_redis = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+REDIS_URL = settings.REDIS_URL
 
+_redis = redis.Redis.from_url(
+    REDIS_URL,
+    decode_responses=True,
+)
 REDIS_KEY_PREFIX = "pzn:rss:"
 REDIS_TTL = 60 * 60                    # 10 min — how long a rendered feed page stays "fresh"
 TRANSLATION_TTL = 60 * 60 * 24 * 7  # 1 week — a given headline's translation almost never changes
