@@ -17,7 +17,7 @@ cron-descriptor==1.4.5
 deep-translator==1.11.4
 deta==0.2.53
 dj-database-url==2.3.0
-Django==6.0.6
+Django==5.1.4
 django-celery-beat==2.9.0
 django-cors-headers==4.6.0
 django-filter==24.3
@@ -41,7 +41,7 @@ markdown-it-py==4.2.0
 mdurl==0.1.2
 narwhals==2.24.0
 networkx==3.6.1
-numpy==2.5.0
+numpy==2.2.0
 packaging==26.2
 pillow==11.1.0
 prompt_toolkit==3.0.52
@@ -54,14 +54,14 @@ python-crontab==3.3.0
 python-dateutil==2.9.0.post0
 python-decouple==3.8
 PyYAML==6.0.3
-redis==4.5.5
+redis==5.2.1
 regex==2026.6.28
 requests==2.34.2
 rich==15.0.0
 ruamel.yaml==0.19.1
 safetensors==0.8.0
-scikit-learn==1.9.0
-scipy==1.18.0
+scikit-learn==1.5.2
+scipy==	1.14.1
 sgmllib3k==1.0.0
 shellingham==1.5.4
 six==1.17.0
